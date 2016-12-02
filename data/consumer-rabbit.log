@@ -1,0 +1,15 @@
+[INFO] Scanning for projects...
+[INFO]                                                                         
+[INFO] ------------------------------------------------------------------------
+[INFO] Building messagebrokenperftest 1.0.0-SNAPSHOT
+[INFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- exec-maven-plugin:1.5.0:java (default-cli) @ messagebrokenperftest ---
+Consumed 100000 messages in 9475ms
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 12.365 s
+[INFO] Finished at: 2016-12-02T16:42:05+00:00
+[INFO] Final Memory: 9M/185M
+[INFO] ------------------------------------------------------------------------

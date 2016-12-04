@@ -40,5 +40,11 @@ it provides per-message latencies that are consistently lower across the entire 
 has a slightly better median latency, but this is completely dominated by significantly worse latencies from around the
 95th percentile.
 
+For raw throughput, the numbers indicate that Rabbit is able to achieve an average of around 425Mbit/s transfer rate 
+(NB: this is the effective transfer rate seen by the application, the wire protocol will be transferring more data 
+than that) on the local loopback interface on this machine. Kafka is achieving 540Mbit/s for the same test, so 
+actually around 27% faster by throughput. It seems likely that either technology could saturate a 1Gbit/s network connection
+with just 2 or 3 broker instances.
+
 Given that Kafka is designed for very high scalability, it is likely that these numbers will widen even favour in Kafka's
 favour in larger scale tests, but these remain to be performed.

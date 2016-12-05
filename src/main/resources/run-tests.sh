@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 
+set -m # Enable job control
+
 mvn clean compile
 
 # Start consumer
 echo "Kafka 100,000 messages"
-mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Consumer -Dexec.args="100000 ons.datadiscovery.broker.perf.KafkaBroker" -l /tmp/consumer-kafka.log &
-mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Producer -Dexec.args="100000 ons.datadiscovery.broker.perf.KafkaBroker" -l /tmp/producer-kafka.log
+mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Consumer -Dexec.args="100000 ons.datadiscovery.broker.perf.KafkaBroker" &
+sleep 0.1
+mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Producer -Dexec.args="100000 ons.datadiscovery.broker.perf.KafkaBroker"
 
-sleep 5
+echo "Waiting for consumer to finish"
+fg
 
 echo "RabbitMQ 100,000 messages"
-mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Consumer -Dexec.args="100000 ons.datadiscovery.broker.perf.RabbitBroker" -l /tmp/consumer-rabbit.log &
-mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Producer -Dexec.args="100000 ons.datadiscovery.broker.perf.RabbitBroker" -l /tmp/producer-rabbit.log
+mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Consumer -Dexec.args="100000 ons.datadiscovery.broker.perf.RabbitBroker" &
+mvn exec:java -Dexec.mainClass=ons.datadiscovery.broker.perf.Producer -Dexec.args="100000 ons.datadiscovery.broker.perf.RabbitBroker"
 
-sleep 5
+echo "Waiting for consumer to finish"
+fg

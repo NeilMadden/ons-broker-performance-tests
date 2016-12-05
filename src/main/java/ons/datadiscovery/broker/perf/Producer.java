@@ -5,11 +5,13 @@ import org.HdrHistogram.Recorder;
 import javax.xml.bind.DatatypeConverter;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.stream.IntStream;
+
+import static ons.datadiscovery.broker.perf.Utils.ignoringExceptions;
 
 /**
- * Created by neil on 02/12/2016.
+ * Produces messages and puts them on the message queue.
  */
 public class Producer {
     private static final String MESSAGE_TEMPLATE = "{\"data\":\"%s\",\"time\":%d}";
@@ -22,17 +24,22 @@ public class Producer {
             final String data = DatatypeConverter.printHexBinary(new byte[256]);
 
             final long startTime = System.currentTimeMillis();
-            for (int i = 0; i < numMessages; ++i) {
+            IntStream.range(0, numMessages).parallel().forEach(i -> {
                 final String message = String.format(Locale.UK, MESSAGE_TEMPLATE, data, System.currentTimeMillis());
                 long start = System.nanoTime();
-                broker.sendMessage(message);
+                ignoringExceptions(() -> broker.sendMessage(message));
                 long end = System.nanoTime();
                 recorder.recordValue(end - start);
-            }
+            });
             final long endTime = System.currentTimeMillis();
 
-            System.out.printf("Sent %d messages of 544 bytes in %dms%n", numMessages, endTime - startTime);
-            System.out.printf("Total MiB sent: %.2f%n", (544 * numMessages) / (1024d * 1024d));
+            final double totalTimeSeconds = (endTime - startTime) / 1000d;
+
+            try (PrintStream log = new PrintStream(new FileOutputStream("/tmp/producer-" + broker.getClass().getSimpleName() + ".log"))) {
+                log.printf("Sent %d messages of 544 bytes in %dms%n", numMessages, endTime - startTime);
+                log.printf("Total MiB sent: %.2f (%.1f Mbit/s)%n", (544 * numMessages) / (1024d * 1024d),
+                        (544 * numMessages * 8) / (totalTimeSeconds * 1024d * 1024d));
+            }
 
 //            System.out.println("Publish time histogram (microseconds):");
 //            recorder.getIntervalHistogram().outputPercentileDistribution(System.out, 1000.0d);
@@ -42,4 +49,5 @@ public class Producer {
             }
         }
     }
+
 }

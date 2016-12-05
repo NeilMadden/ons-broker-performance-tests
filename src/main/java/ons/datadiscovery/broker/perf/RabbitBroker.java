@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Created by neil on 02/12/2016.
@@ -16,52 +17,53 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RabbitBroker implements Broker {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final ConnectionFactory connectionFactory;
+    private final AtomicReference<CountDownLatch> latch = new AtomicReference<>(null);
 
-    private final Connection connection;
-    private final Channel channel;
+    private final Channel sendChannel;
 
-    public RabbitBroker() {
-        ConnectionFactory connectionFactory = new ConnectionFactory();
+    public RabbitBroker() throws Exception {
+        connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        try {
-            connection = connectionFactory.newConnection();
-            channel = connection.createChannel();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+
+        sendChannel = getChannel();
+    }
+
+    private Channel getChannel() throws Exception {
+        final Connection connection = connectionFactory.newConnection();
+        return connection.createChannel();
     }
 
     @Override
     public void sendMessage(String message) throws Exception {
-        channel.basicPublish("test", "test-key", null, message.getBytes(StandardCharsets.UTF_8));
+        sendChannel.basicPublish("test", "test-key", null, message.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override
-    public Callable<Long> startConsumer(final int expected, final Recorder recorder) throws Exception {
+    public Callable<Long> startConsumer(final int expected, final Recorder recorder) {
+        latch.compareAndSet(null, new CountDownLatch(expected));
         return () -> {
-            final CountDownLatch latch = new CountDownLatch(expected);
-            final RabbitConsumer consumer = new RabbitConsumer(channel, latch, recorder);
+            final Channel channel = getChannel();
+            final RabbitConsumer consumer = new RabbitConsumer(channel, recorder);
             channel.basicConsume("test", true, consumer);
-            latch.await();
+            latch.get().await();
             return consumer.getFirstMessageReceivedTime();
         };
     }
 
     @Override
     public void close() throws Exception {
-        channel.close();
-        connection.close();
+        sendChannel.close();
+        sendChannel.getConnection().close();
     }
 
-    private static class RabbitConsumer extends DefaultConsumer {
-        private final CountDownLatch latch;
+    private class RabbitConsumer extends DefaultConsumer {
         private final Recorder recorder;
 
         private final AtomicLong firstMessageReceived = new AtomicLong(0L);
 
-        RabbitConsumer(Channel channel, CountDownLatch latch, Recorder recorder) {
+        RabbitConsumer(Channel channel, Recorder recorder) {
             super(channel);
-            this.latch = latch;
             this.recorder = recorder;
         }
 
@@ -70,9 +72,9 @@ public class RabbitBroker implements Broker {
                 throws IOException {
             final long processTime = System.currentTimeMillis();
             firstMessageReceived.compareAndSet(0L, processTime);
+            latch.get().countDown();
             final long sendTime = objectMapper.readTree(body).get("time").asLong();
             recorder.recordValue(processTime - sendTime);
-            latch.countDown();
         }
 
         long getFirstMessageReceivedTime() {

@@ -25,13 +25,13 @@ public class KafkaBroker implements Broker {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final Properties props;
     private final KafkaProducer<String, String> producer;
-    private final KafkaConsumer<String, String> consumer;
 
     private final LongAdder totalReceived = new LongAdder();
 
     public KafkaBroker() {
-        Properties props = new Properties();
+        props = new Properties();
         props.put("bootstrap.servers", "127.0.0.1:9092");
         props.put("group.id", UUID.randomUUID().toString());
         props.put("key.serializer", StringSerializer.class.getName());
@@ -40,7 +40,6 @@ public class KafkaBroker implements Broker {
         props.put("value.deserializer", StringDeserializer.class.getName());
 
         this.producer = new KafkaProducer<>(props);
-        this.consumer = new KafkaConsumer<>(props);
     }
 
     @Override
@@ -49,36 +48,42 @@ public class KafkaBroker implements Broker {
     }
 
     @Override
-    public Callable<Long> startConsumer(final int expected, final Recorder recorder) throws Exception {
-        consumer.subscribe(Collections.singleton("test"));
+    public Callable<Long> startConsumer(final int expected, final Recorder recorder) {
         return () -> {
-            long firstMessage = Long.MAX_VALUE;
-            while (totalReceived.longValue() < expected) {
-                final ConsumerRecords<String, String> records = consumer.poll(100);
-                if (records.isEmpty()) { continue; }
-                long processTime = System.currentTimeMillis();
-                totalReceived.add(records.count());
+            try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
+                consumer.subscribe(Collections.singleton("test"));
 
-//                System.out.printf("Received %d of %d%n", totalReceived.longValue(), expected);
+                long firstMessage = Long.MAX_VALUE;
+                while (totalReceived.longValue() < expected) {
+                    final ConsumerRecords<String, String> records = consumer.poll(100);
+                    if (records.isEmpty()) {
+                        continue;
+                    }
+                    long processTime = System.currentTimeMillis();
+                    totalReceived.add(records.count());
 
-                for (ConsumerRecord<String, String> record : records) {
-                    if (firstMessage == Long.MAX_VALUE) { firstMessage = System.currentTimeMillis(); }
-                    try {
-                        JsonNode json = objectMapper.readTree(record.value());
-                        long startTime = json.get("time").asLong();
-                        recorder.recordValue(processTime - startTime);
-                    } catch (IOException e) {
-                        e.printStackTrace();
+//                    System.out.printf("Received %d of %d (%dms)%n", totalReceived.longValue(), expected, processTime - firstMessage);
+
+                    for (ConsumerRecord<String, String> record : records) {
+                        if (firstMessage == Long.MAX_VALUE) {
+                            firstMessage = processTime;
+                        }
+                        try {
+                            JsonNode json = objectMapper.readTree(record.value());
+                            long startTime = json.get("time").asLong();
+                            recorder.recordValue(processTime - startTime);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
+                return firstMessage;
             }
-            return firstMessage;
         };
     }
 
     @Override
     public void close() throws Exception {
         producer.close();
-        consumer.close();
     }
 }

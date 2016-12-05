@@ -11,5 +11,5 @@ public interface Broker extends AutoCloseable {
 
     void sendMessage(String message) throws Exception;
 
-    Callable<Long> startConsumer(final int expected, final Recorder recorder) throws Exception;
+    Callable<Long> startConsumer(final int expected, final Recorder recorder);
 }

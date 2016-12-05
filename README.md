@@ -56,20 +56,3 @@ times faster than Rabbit in this test!
 The latency distributions for the producers are given below, showing Kafka producing messages faster across the board:
 
 ![](data/parallel/Producer-10000.png)
-
-### Summary
-
-Kafka is generally faster than Rabbit for producers and consumers in these single-broker tests - about 2 seconds
-faster (~20%) in the end-to-end timing. This is a significant performance win for our use-cases. For producers,
-it provides per-message latencies that are consistently lower across the entire percentile range. For consumers, Rabbit
-has a slightly better median latency, but this is completely dominated by significantly worse latencies from around the
-95th percentile.
-
-For raw throughput, the numbers indicate that Rabbit is able to achieve an average of around 42.5 Mbit/s transfer rate 
-(NB: this is the effective transfer rate seen by the application, the wire protocol will be transferring more data 
-than that) on the local loopback interface on this machine. Kafka is achieving 54.1 Mbit/s for the same test, so 
-actually around 27% faster by throughput. Both are quite far away from saturating a 1Gbit/s network, so scaling up will
-be key to maximising throughput.
-
-Given that Kafka is designed for very high scalability, it is likely that these numbers will widen even favour in Kafka's
-favour in larger scale tests, but these remain to be performed.
